@@ -58,6 +58,16 @@ kyff-store/
 │   ├── test_orders.py
 │   └── test_payments.py
 │
+├── frontend/
+│   ├── templates/
+│   │   ├── base.html
+│   │   ├── index.html
+│   │   └── admin/
+│   └── static/
+│       ├── css/
+│       ├── js/
+│       └── images/
+│
 ├── .env                             # Never committed
 ├── .env.example
 ├── .gitignore
