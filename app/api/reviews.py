@@ -26,7 +26,7 @@ def _review_dict(r):
 @reviews_bp.post("/")
 @jwt_required
 def create_review():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     data = request.get_json(silent=True) or {}
 
     if not data.get("product_id"):
@@ -75,7 +75,7 @@ def create_review():
 @reviews_bp.put("/<int:review_id>")
 @jwt_required
 def update_review(review_id):
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     review = Review.query.filter_by(id=review_id, user_id=user_id).first()
     if not review:
         return jsonify({"data": None, "message": "Review not found"}), 404
@@ -100,7 +100,7 @@ def update_review(review_id):
 @reviews_bp.delete("/<int:review_id>")
 @jwt_required
 def delete_review(review_id):
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     review = Review.query.filter_by(id=review_id, user_id=user_id).first()
     if not review:
         return jsonify({"data": None, "message": "Review not found"}), 404

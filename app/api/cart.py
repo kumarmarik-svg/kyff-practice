@@ -10,7 +10,7 @@ def _resolve_cart():
     """Return the cart for the current user (JWT) or guest (session_key header)."""
     try:
         verify_jwt_in_request(optional=True)
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
     except Exception:
         user_id = None
 
@@ -95,7 +95,7 @@ def remove_item(item_id):
 def merge_cart():
     try:
         verify_jwt_in_request()
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
     except Exception:
         return jsonify({"data": None, "message": "Authentication required"}), 401
 

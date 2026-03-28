@@ -94,7 +94,7 @@ def refresh():
 @auth_bp.get("/me")
 @jwt_required
 def me():
-    user = auth_service.get_user_by_id(get_jwt_identity())
+    user = auth_service.get_user_by_id(int(get_jwt_identity()))
     return jsonify({"data": _user_dict(user), "message": "OK"})
 
 
@@ -102,7 +102,7 @@ def me():
 @auth_bp.put("/me")
 @jwt_required
 def update_me():
-    user = auth_service.get_user_by_id(get_jwt_identity())
+    user = auth_service.get_user_by_id(int(get_jwt_identity()))
     data = request.get_json(silent=True) or {}
     user = auth_service.update_user(user, data)
     return jsonify({"data": _user_dict(user), "message": "Profile updated"})
@@ -145,7 +145,7 @@ def reset_password():
 @auth_bp.get("/addresses")
 @jwt_required
 def list_addresses():
-    user = auth_service.get_user_by_id(get_jwt_identity())
+    user = auth_service.get_user_by_id(int(get_jwt_identity()))
     return jsonify({"data": [_address_dict(a) for a in auth_service.get_addresses(user)], "message": "OK"})
 
 
@@ -153,7 +153,7 @@ def list_addresses():
 @auth_bp.post("/addresses")
 @jwt_required
 def create_address():
-    user = auth_service.get_user_by_id(get_jwt_identity())
+    user = auth_service.get_user_by_id(int(get_jwt_identity()))
     data = request.get_json(silent=True) or {}
     required = ("full_name", "phone", "line1", "city", "state", "pincode")
     missing = [f for f in required if not data.get(f)]
@@ -168,7 +168,7 @@ def create_address():
 @auth_bp.put("/addresses/<int:address_id>")
 @jwt_required
 def update_address(address_id):
-    user = auth_service.get_user_by_id(get_jwt_identity())
+    user = auth_service.get_user_by_id(int(get_jwt_identity()))
     data = request.get_json(silent=True) or {}
     try:
         address = auth_service.update_address(user, address_id, data)
@@ -181,7 +181,7 @@ def update_address(address_id):
 @auth_bp.delete("/addresses/<int:address_id>")
 @jwt_required
 def delete_address(address_id):
-    user = auth_service.get_user_by_id(get_jwt_identity())
+    user = auth_service.get_user_by_id(int(get_jwt_identity()))
     try:
         auth_service.delete_address(user, address_id)
     except ValueError as e:

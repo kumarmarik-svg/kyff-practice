@@ -4,12 +4,15 @@ from .extensions import db, migrate, jwt, bcrypt
 from .config import config_map
 
 
-def create_app(config_name: str | None = None) -> Flask:
+def create_app(config_name: str | None = None, test_config: dict | None = None) -> Flask:
     if config_name is None:
         config_name = os.environ.get("FLASK_ENV", "development")
 
     app = Flask(__name__)
     app.config.from_object(config_map[config_name])
+
+    if test_config:
+        app.config.update(test_config)
 
     # Import models so SQLAlchemy metadata is populated for migrations
     from . import models  # noqa: F401

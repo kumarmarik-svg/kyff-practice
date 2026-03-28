@@ -59,7 +59,7 @@ def _payment_dict(payment):
 @orders_bp.post("/")
 @jwt_required
 def create_order():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     data = request.get_json(silent=True) or {}
 
     shipping_address = data.get("shipping_address")
@@ -90,7 +90,7 @@ def create_order():
 @orders_bp.get("/")
 @jwt_required
 def list_orders():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     orders = order_service.get_user_orders(user_id)
     return jsonify({"data": [_order_dict(o) for o in orders], "message": "OK"})
 
@@ -99,7 +99,7 @@ def list_orders():
 @orders_bp.get("/<order_number>")
 @jwt_required
 def get_order(order_number):
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     try:
         order = order_service.get_order(order_number, user_id)
     except ValueError as e:

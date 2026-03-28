@@ -22,8 +22,8 @@ def register_user(data: dict) -> tuple[User, str, str]:
     db.session.add(user)
     db.session.commit()
 
-    access_token = create_access_token(identity=user.id)
-    refresh_token = create_refresh_token(identity=user.id)
+    access_token = create_access_token(identity=str(user.id))
+    refresh_token = create_refresh_token(identity=str(user.id))
     return user, access_token, refresh_token
 
 
@@ -34,8 +34,8 @@ def login_user(email: str, password: str) -> tuple[User, str, str]:
     if not user.is_active:
         raise ValueError("Account is disabled")
 
-    access_token = create_access_token(identity=user.id)
-    refresh_token = create_refresh_token(identity=user.id)
+    access_token = create_access_token(identity=str(user.id))
+    refresh_token = create_refresh_token(identity=str(user.id))
     return user, access_token, refresh_token
 
 

@@ -11,7 +11,7 @@ payments_bp = Blueprint("payments", __name__)
 @payments_bp.post("/create")
 @jwt_required
 def create_payment():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     data = request.get_json(silent=True) or {}
 
     order_number = data.get("order_number")
