@@ -135,5 +135,5 @@ with app.app_context():
     print("  Categories : 4")
     print("  Products   : 5 (1 with 3 variants)")
     print("  Banners    : 2")
-    print("  Shipping   : 2 rules (free above ₹499, ₹50 standard)")
+    print("  Shipping   : 2 rules (free above Rs.499, Rs.50 standard)")
     print("  Admin user : admin@kyff.store / Admin@1234")
