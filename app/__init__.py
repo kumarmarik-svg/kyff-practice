@@ -11,6 +11,9 @@ def create_app(config_name: str | None = None) -> Flask:
     app = Flask(__name__)
     app.config.from_object(config_map[config_name])
 
+    # Import models so SQLAlchemy metadata is populated for migrations
+    from . import models  # noqa: F401
+
     # Init extensions
     db.init_app(app)
     migrate.init_app(app, db)
