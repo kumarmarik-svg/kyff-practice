@@ -584,3 +584,274 @@ DELETE /api/admin/shipping-rules/<id>
 - **Banners:** `starts_at` / `ends_at` allow scheduled campaigns. Public API filters by `is_active=True AND (starts_at IS NULL OR starts_at <= now) AND (ends_at IS NULL OR ends_at >= now)`.
 - **Soft deletes** not used; `is_active` flags keep FK integrity intact.
 - **JWT:** 15-min access tokens + 7-day refresh tokens.
+
+---
+
+## 6. Frontend Plan — React + Vite + Tailwind CSS
+
+### Overview
+
+The frontend is a standalone SPA that lives in `frontend/` and talks exclusively to the Flask REST API at `/api/*`. It is built and served independently from the Flask app (Vite dev server in development, static build in production).
+
+| Concern | Choice |
+|---|---|
+| Framework | React 18 |
+| Build tool | Vite 5 |
+| Styling | Tailwind CSS 3 |
+| Routing | React Router v6 |
+| State | Zustand (lightweight global store) |
+| Data fetching | TanStack Query v5 (server state) |
+| HTTP client | Axios (with interceptors for JWT refresh) |
+| Forms | React Hook Form |
+| Payments | Razorpay.js (loaded via CDN script tag) |
+| Icons | Lucide React |
+
+---
+
+### Folder Structure
+
+```
+frontend/
+├── index.html
+├── vite.config.js           # proxy /api → Flask :5000
+├── tailwind.config.js
+├── postcss.config.js
+├── package.json
+│
+└── src/
+    ├── main.jsx             # ReactDOM.createRoot, QueryClientProvider, Router
+    ├── App.jsx              # Route definitions
+    │
+    ├── api/                 # Axios instance + one file per resource
+    │   ├── client.js        # baseURL, JWT interceptor, refresh logic
+    │   ├── auth.js
+    │   ├── products.js
+    │   ├── categories.js
+    │   ├── cart.js
+    │   ├── orders.js
+    │   ├── payments.js
+    │   ├── reviews.js
+    │   ├── banners.js
+    │   └── admin.js
+    │
+    ├── store/               # Zustand slices
+    │   ├── authStore.js     # user, accessToken, isLoggedIn, login(), logout()
+    │   └── cartStore.js     # sessionKey (guest), itemCount, setItemCount()
+    │
+    ├── hooks/               # TanStack Query wrappers
+    │   ├── useProducts.js
+    │   ├── useCart.js
+    │   ├── useOrders.js
+    │   └── useAdmin.js
+    │
+    ├── components/
+    │   ├── layout/
+    │   │   ├── Navbar.jsx          # Logo, search, cart icon (count), auth links
+    │   │   ├── Footer.jsx
+    │   │   └── AdminLayout.jsx     # Sidebar + content area for admin pages
+    │   │
+    │   ├── ui/                     # Headless / reusable primitives
+    │   │   ├── Button.jsx
+    │   │   ├── Input.jsx
+    │   │   ├── Modal.jsx
+    │   │   ├── Toast.jsx           # Success / error notifications
+    │   │   ├── Spinner.jsx
+    │   │   ├── Pagination.jsx
+    │   │   └── Badge.jsx           # "Organic", "Sale", stock status
+    │   │
+    │   ├── product/
+    │   │   ├── ProductCard.jsx     # Image, name, price, add-to-cart button
+    │   │   ├── ProductGrid.jsx     # Responsive grid of ProductCards
+    │   │   ├── ProductFilters.jsx  # Category, organic, sort dropdowns
+    │   │   ├── VariantSelector.jsx # Buttons for 500g / 1kg / 5kg etc.
+    │   │   ├── ImageGallery.jsx    # Primary + thumbnail strip
+    │   │   └── ReviewList.jsx      # Paginated approved reviews
+    │   │
+    │   ├── cart/
+    │   │   ├── CartDrawer.jsx      # Slide-in panel (desktop)
+    │   │   ├── CartItem.jsx        # Qty stepper, remove button
+    │   │   └── CartSummary.jsx     # Subtotal, shipping estimate, checkout CTA
+    │   │
+    │   ├── checkout/
+    │   │   ├── AddressForm.jsx     # Reusable address fields (React Hook Form)
+    │   │   ├── AddressPicker.jsx   # Saved addresses + "use new address"
+    │   │   └── RazorpayButton.jsx  # Loads Razorpay.js, opens checkout, calls verify
+    │   │
+    │   ├── auth/
+    │   │   ├── LoginForm.jsx
+    │   │   └── RegisterForm.jsx
+    │   │
+    │   └── admin/
+    │       ├── StatsCard.jsx         # Revenue / orders / users / low-stock tiles
+    │       ├── DataTable.jsx         # Generic sortable table with pagination
+    │       ├── ProductForm.jsx       # Create / edit product (with variants)
+    │       ├── OrderStatusSelect.jsx # Dropdown for status + tracking number
+    │       ├── BannerForm.jsx
+    │       └── ShippingRuleForm.jsx
+    │
+    └── pages/
+        ├── HomePage.jsx
+        ├── ProductListPage.jsx
+        ├── ProductDetailPage.jsx
+        ├── CartPage.jsx
+        ├── CheckoutPage.jsx
+        ├── OrderConfirmPage.jsx
+        ├── OrderHistoryPage.jsx
+        ├── OrderDetailPage.jsx
+        ├── LoginPage.jsx
+        ├── RegisterPage.jsx
+        ├── ProfilePage.jsx
+        └── admin/
+            ├── AdminDashboardPage.jsx
+            ├── AdminProductsPage.jsx
+            ├── AdminOrdersPage.jsx
+            ├── AdminUsersPage.jsx
+            ├── AdminReviewsPage.jsx
+            ├── AdminBannersPage.jsx
+            └── AdminShippingPage.jsx
+```
+
+---
+
+### State Management
+
+#### Zustand — `authStore`
+```
+{ user, accessToken, refreshToken, isLoggedIn }
+Actions: login(tokens, user), logout(), setAccessToken(token)
+Persisted to: localStorage (refreshToken only — access token in memory)
+```
+
+#### Zustand — `cartStore`
+```
+{ sessionKey, itemCount }
+Actions: initSessionKey(), setItemCount(n), clearCart()
+sessionKey: UUID generated on first visit, stored in localStorage
+itemCount: kept in sync after every cart mutation for Navbar badge
+```
+
+#### TanStack Query — server state
+All API data (products, cart contents, orders, admin tables) lives in TanStack Query cache. Zustand only holds auth tokens and the guest session key.
+
+---
+
+### API Integration
+
+#### `src/api/client.js`
+```
+- baseURL: /api  (Vite proxy → Flask :5000 in dev)
+- Request interceptor: attach Authorization: Bearer <accessToken> from authStore
+- Response interceptor (401): call POST /api/auth/refresh → update accessToken → retry original request
+- Guest cart header: attach X-Session-Key from cartStore.sessionKey on all cart requests
+```
+
+#### Resource modules (examples)
+```
+auth.js      → register, login, logout, me, updateMe, forgotPassword, resetPassword, addresses CRUD
+products.js  → list(params), featured(), search(q), detail(slug), reviews(slug, page)
+cart.js      → get, addItem, updateItem, removeItem, merge(sessionKey)
+orders.js    → create(payload), list(), get(orderNumber)
+payments.js  → create(orderNumber), verify(payload)
+admin.js     → dashboard, products CRUD, orders list+status, users list+toggle, reviews+approve, banners CRUD, shipping CRUD
+```
+
+---
+
+### Page Breakdown
+
+#### FE-1 — Home (`HomePage`)
+- Fetch: `GET /api/banners?position=home_hero`, `GET /api/categories`, `GET /api/products?featured=true`
+- Components: `<HeroBanner>` (auto-slide), `<CategoryStrip>`, `<ProductGrid limit=8>`
+- On mount: init `cartStore.sessionKey` if not set
+
+#### FE-2 — Product List (`ProductListPage`)
+- Route: `/products?category=<slug>&q=<search>&page=<n>`
+- Fetch: `GET /api/products` with query params
+- Components: `<ProductFilters>`, `<ProductGrid>`, `<Pagination>`
+- URL-driven filters — React Router `useSearchParams`
+
+#### FE-3 — Product Detail (`ProductDetailPage`)
+- Route: `/products/:slug`
+- Fetch: `GET /api/products/:slug`, `GET /api/products/:slug/reviews`
+- Components: `<ImageGallery>`, `<VariantSelector>`, qty input, `<AddToCartButton>`, `<ReviewList>`
+- Variant selection updates displayed price; `variant_id` sent to cart API
+
+#### FE-4 — Cart (`CartPage` + `CartDrawer`)
+- Fetch: `GET /api/cart` (header: `X-Session-Key` or JWT)
+- Components: `<CartItem>` (qty stepper → `PUT /api/cart/items/:id`), `<CartSummary>`
+- On login: `POST /api/cart/merge` → invalidate cart query → update `cartStore.itemCount`
+
+#### FE-5 — Checkout (`CheckoutPage`)
+- Protected route (redirect to login if not authenticated)
+- Steps: address selection → order summary → pay
+- `POST /api/orders` → get `order_number`
+- `POST /api/payments/create` → get `razorpay_order_id`
+- Open Razorpay.js modal → on success: `POST /api/payments/verify` → redirect to `OrderConfirmPage`
+
+#### FE-6 — Auth (`LoginPage` / `RegisterPage`)
+- `LoginPage`: calls `POST /api/auth/login` → stores tokens in authStore → triggers cart merge → redirect
+- `RegisterPage`: calls `POST /api/auth/register` → same flow
+- Redirect back to previous page using React Router `state.from`
+
+#### FE-7 — Admin (`/admin/*`)
+- Protected by `isAdmin` check in route guard (`AdminRoute` wrapper)
+- `AdminDashboardPage`: stats tiles from `GET /api/admin/dashboard`
+- `AdminProductsPage`: paginated `<DataTable>` + `<ProductForm>` modal for create/edit
+- `AdminOrdersPage`: filterable by status, inline `<OrderStatusSelect>`
+- `AdminUsersPage`: paginated table, toggle-active button
+- `AdminReviewsPage`: filter by `approved=false`, approve button
+- `AdminBannersPage`: `<BannerForm>` modal, sort_order drag-handle (future)
+- `AdminShippingPage`: `<ShippingRuleForm>` modal
+
+---
+
+### Frontend Build Order
+
+#### FE Phase 1 — Setup
+1. `npm create vite@latest frontend -- --template react`
+2. Install: `tailwindcss`, `react-router-dom`, `zustand`, `@tanstack/react-query`, `axios`, `react-hook-form`, `lucide-react`
+3. Configure Vite proxy: `/api` → `http://localhost:5000`
+4. Set up Tailwind, base layout (`Navbar`, `Footer`)
+5. Create `api/client.js` with JWT interceptor
+
+#### FE Phase 2 — Auth + Store
+6. `authStore.js` + `cartStore.js` (Zustand, localStorage persistence)
+7. `LoginPage` + `RegisterPage` — connect to `/api/auth`
+8. Protected route wrapper (`PrivateRoute`, `AdminRoute`)
+9. `Navbar` shows user name / logout when logged in
+
+#### FE Phase 3 — Catalog
+10. `HomePage` — banners, categories, featured products
+11. `ProductListPage` — paginated grid with filters and search
+12. `ProductDetailPage` — gallery, variants, add to cart
+
+#### FE Phase 4 — Cart
+13. `cartStore` itemCount badge in `Navbar`
+14. `CartDrawer` (slide-in) + `CartPage` (full page)
+15. Qty stepper, remove item, subtotal
+16. Cart merge on login
+
+#### FE Phase 5 — Checkout & Orders
+17. `CheckoutPage` — address picker + `AddressForm`
+18. `RazorpayButton` — full Razorpay.js integration
+19. `OrderConfirmPage`, `OrderHistoryPage`, `OrderDetailPage`
+
+#### FE Phase 6 — Admin
+20. `AdminLayout` — sidebar with nav links
+21. `AdminDashboardPage` — stats tiles
+22. `AdminProductsPage` — CRUD with `ProductForm` modal (variants support)
+23. `AdminOrdersPage` — status update inline
+24. `AdminUsersPage`, `AdminReviewsPage`, `AdminBannersPage`, `AdminShippingPage`
+
+---
+
+### Key Frontend Design Decisions
+
+- **No SSR** — pure SPA. SEO handled via meta tags for now; can add React Helmet later.
+- **Guest cart persistence** — `sessionKey` UUID in `localStorage`. On login, `POST /api/cart/merge` unifies carts.
+- **JWT in memory** — `accessToken` in Zustand (not localStorage) to reduce XSS risk. `refreshToken` in localStorage with 7-day TTL.
+- **Axios 401 interceptor** — transparently refreshes the access token and retries the original request. User never sees a flash of "logged out".
+- **Vite proxy** — all `/api/*` requests proxied to Flask in dev, so no CORS issues during development. In production, Nginx serves both the React build and proxies `/api` to Gunicorn.
+- **TanStack Query** — `queryKey` conventions: `['products', params]`, `['cart']`, `['orders']`, `['admin', 'products', page]`. Mutations invalidate relevant queries on success.
+- **Razorpay flow** — `RazorpayButton` dynamically loads `https://checkout.razorpay.com/v1/checkout.js`, opens the modal with `razorpay_order_id` from our API, and on `payment.success` calls `POST /api/payments/verify`. On failure, shows a Toast and allows retry without recreating the order.
+- **Tailwind design tokens** — extend `tailwind.config.js` with KYFF brand colours (earthy greens and warm neutrals) so all components use consistent design tokens.
