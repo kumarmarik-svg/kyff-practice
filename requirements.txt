@@ -38,3 +38,4 @@ factory-boy==3.3.0
 
 # Dev
 flask-shell-ipython==0.5.1
+razorpay==2.0.1
